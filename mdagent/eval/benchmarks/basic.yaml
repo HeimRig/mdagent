@@ -1,0 +1,138 @@
+# 覆盖 top1 / count / aggregate / groupby / filter / timeseries / ratio / multistep
+# expect 由同题 gold_sql 在本数据集上实算得到（make key 可重算）
+# 数据源固定为 data/sample/sales.csv
+
+- id: q1
+  question: 哪个城市的销售额最高？是多少？
+  tag: top1
+  expect: '11986.50'
+  gold_sql: SELECT ROUND(SUM(amount),2) AS v FROM sales GROUP BY city ORDER BY v DESC
+    LIMIT 1
+- id: q2
+  question: 一共有多少笔订单？
+  tag: count
+  expect: '240'
+  gold_sql: SELECT COUNT(*) AS v FROM sales
+- id: q3
+  question: 所有订单的总销售额是多少？
+  tag: aggregate
+  expect: '49120.80'
+  gold_sql: SELECT ROUND(SUM(amount),2) AS v FROM sales
+- id: q4
+  question: 销售额最高的商品分类，其销售额是多少？
+  tag: groupby
+  expect: '28920.00'
+  gold_sql: SELECT ROUND(SUM(amount),2) AS v FROM sales GROUP BY category ORDER BY
+    v DESC LIMIT 1
+- id: q5
+  question: 销售额最高的那个月，销售额是多少？
+  tag: timeseries
+  expect: '10653.80'
+  gold_sql: SELECT ROUND(SUM(amount),2) AS v FROM sales GROUP BY strftime(date,'%Y-%m')
+    ORDER BY v DESC LIMIT 1
+- id: q6
+  question: 平均每个订单的金额是多少？
+  tag: aggregate
+  expect: '204.67'
+  gold_sql: SELECT ROUND(AVG(amount),2) AS v FROM sales
+- id: q7
+  question: 销售额最高的产品是哪一个？它的销售额是多少？
+  tag: top1
+  expect: '20430.00'
+  gold_sql: SELECT ROUND(SUM(amount),2) AS v FROM sales GROUP BY product ORDER BY
+    v DESC LIMIT 1
+- id: q8
+  question: 成都的销售额是多少？
+  tag: filter
+  expect: '9699.80'
+  gold_sql: SELECT ROUND(SUM(amount),2) AS v FROM sales WHERE city='成都'
+- id: q9
+  question: 上海的销售额是多少？
+  tag: filter
+  expect: '9100.20'
+  gold_sql: SELECT ROUND(SUM(amount),2) AS v FROM sales WHERE city='上海'
+- id: q10
+  question: 2026 年 3 月的销售额是多少？
+  tag: filter
+  expect: '9797.70'
+  gold_sql: SELECT ROUND(SUM(amount),2) AS v FROM sales WHERE date >= DATE '2026-03-01'
+    AND date < DATE '2026-04-01'
+- id: q11
+  question: 各城市的平均订单金额中，最高的是多少元？
+  tag: multistep
+  expect: '269.44'
+  gold_sql: SELECT ROUND(MAX(avg_amt),2) AS v FROM (SELECT AVG(amount) AS avg_amt
+    FROM sales GROUP BY city)
+- id: q12
+  question: 水果类的总销售额是多少？
+  tag: filter
+  expect: '8450.30'
+  gold_sql: SELECT ROUND(SUM(amount),2) AS v FROM sales WHERE category='水果'
+- id: q13
+  question: 卖出数量最多的产品，一共卖了多少件？
+  tag: top1
+  expect: '560'
+  gold_sql: SELECT SUM(qty) AS v FROM sales GROUP BY product ORDER BY v DESC LIMIT
+    1
+- id: q14
+  question: 单价最高的产品，单价是多少？
+  tag: top1
+  expect: '45.00'
+  gold_sql: SELECT MAX(unit_price) AS v FROM sales
+- id: q15
+  question: 金额超过 300 元的订单占总订单数的百分比是多少？
+  tag: ratio
+  expect: '17.92'
+  gold_sql: SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE amount > 300) / COUNT(*),
+    2) AS v FROM sales
+- id: q16
+  question: 肉蛋类商品在杭州的销售额是多少？
+  tag: multistep
+  expect: '7597.80'
+  gold_sql: SELECT ROUND(SUM(amount),2) AS v FROM sales WHERE category='肉蛋' AND city='杭州'
+- id: q17
+  question: 水果类销售额占总销售额的百分比是多少？
+  tag: ratio
+  expect: '17.20'
+  gold_sql: SELECT ROUND(100.0 * SUM(CASE WHEN category='水果' THEN amount END) / SUM(amount),
+    2) AS v FROM sales
+- id: q18
+  question: 3 月到 5 月这三个月的总销售额是多少？
+  tag: timeseries
+  expect: '22838.50'
+  gold_sql: SELECT ROUND(SUM(amount),2) AS v FROM sales WHERE date >= DATE '2026-03-01'
+    AND date < DATE '2026-06-01'
+- id: q19
+  question: 平均每个订单卖了多少件商品？
+  tag: aggregate
+  expect: '20.88'
+  gold_sql: SELECT ROUND(AVG(qty),2) AS v FROM sales
+- id: q20
+  question: 销售额最低的城市，销售额是多少？
+  tag: top1
+  expect: '5753.30'
+  gold_sql: SELECT ROUND(SUM(amount),2) AS v FROM sales GROUP BY city ORDER BY v ASC
+    LIMIT 1
+- id: q21
+  question: 苹果这个产品一共卖出了多少件？
+  tag: filter
+  expect: '495'
+  gold_sql: SELECT SUM(qty) AS v FROM sales WHERE product='苹果'
+- id: q22
+  question: 2 月份深圳的销售额是多少？
+  tag: multistep
+  expect: '674.00'
+  gold_sql: SELECT ROUND(SUM(amount),2) AS v FROM sales WHERE city='深圳' AND date >=
+    DATE '2026-02-01' AND date < DATE '2026-03-01'
+- id: q23
+  question: 销售额前 3 名的城市，销售额合计是多少？
+  tag: multistep
+  expect: '30786.50'
+  gold_sql: SELECT ROUND(SUM(v),2) AS x FROM (SELECT SUM(amount) AS v FROM sales GROUP
+    BY city ORDER BY v DESC LIMIT 3)
+- id: q24
+  question: 销量（件数）最高的商品分类，一共卖了多少件？
+  tag: groupby
+  expect: '1830'
+  gold_sql: SELECT SUM(qty) AS v FROM sales GROUP BY category ORDER BY v DESC LIMIT
+    1
