@@ -1,5 +1,9 @@
 # mdagent — 多智能体数据分析 Agent
 
+[![CI](https://github.com/HeimRig/mdagent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/HeimRig/mdagent/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 用自然语言问一份 CSV / SQLite，自动生成代码、**真实执行**、自我校验、输出结论报告。
 
 这个项目最大的不同不是"能跑"，而是**能报出自己有多准**：自带一套 benchmark，
