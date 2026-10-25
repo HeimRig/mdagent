@@ -24,6 +24,8 @@ def main() -> None:
     print(line)
     print(state.get("report") or "(没有生成报告)")
     print(line)
+    if state.get("chart"):
+        print("图表 ->", state["chart"])
     print(
         f"轮数 {state.get('rounds')} | Critic 通过 {state.get('verdict')} "
         f"| token {state.get('prompt_tokens')}+{state.get('completion_tokens')}"

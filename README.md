@@ -228,6 +228,7 @@ mdagent/
 │   ├── agents/                 planner / coder / critic / reporter
 │   ├── graph/pipeline.py       LangGraph 状态机（含无依赖退化路径）
 │   ├── runtime/sandbox.py      子进程 / Docker 双后端，auto 自动回退
+│   ├── charts.py               结果表格 → 图表，数据形状不合适就不画
 │   ├── llm/                    offline / openai 兼容后端
 │   └── eval/                   benchmark + 指标 + 报告 + 消融实验
 │       └── benchmarks/         题目 + gold SQL + 答案键生成器
@@ -249,7 +250,7 @@ mdagent/
 - [x] benchmark 扩到 24 题 + 8 类题型 + gold SQL 答案键 + 分题型统计
 - [x] 沙箱换成 Docker（`--network=none --read-only`，`auto` 自动回退）
 - [x] Gradio 界面（`python app.py`，四个角色的中间产物都能展开看）
-- [ ] 自动出图：让 Reporter 生成 matplotlib 图并嵌进报告
+- [x] 自动出图：结果表格满足「类别列 + 数值列」时画柱状图（`mdagent/charts.py`）
 - [ ] 多表 / SQLite 数据源
 
 ## License

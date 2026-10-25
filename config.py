@@ -28,6 +28,11 @@ SANDBOX_TIMEOUT = 20
 MAX_REPAIR_ROUNDS = 3
 TRACE_DIR = ROOT / "runs"
 
+# ---------- 出图 ----------
+# 结果表格满足「一个类别列 + 一个数值列」时自动画图
+ENABLE_CHART = True
+FIGURE_DIR = TRACE_DIR / "figures"
+
 # ---------- 评测 ----------
 BENCHMARK_PATH = ROOT / "mdagent" / "eval" / "benchmarks" / "basic.yaml"
 EVAL_REPORT_DIR = ROOT / "mdagent" / "eval" / "reports"

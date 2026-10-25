@@ -95,6 +95,7 @@ def answer(question, max_rounds, progress=gr.Progress()):
     return (
         meta,
         state.get("report") or "(没有生成报告)",
+        state.get("chart") or None,
         state.get("plan") or "(未生成)",
         state.get("code") or "",
         stdout + (f"\n[stderr]\n{stderr}" if stderr else ""),
@@ -123,6 +124,7 @@ def build_ui():
             with gr.Column(scale=3):
                 meta = gr.Markdown("等待运行…")
                 report = gr.Markdown()
+                chart = gr.Image(label="结果图表", type="filepath", height=340)
 
         with gr.Accordion("Planner 计划", open=False):
             plan = gr.Textbox(lines=6, show_label=False)
@@ -133,7 +135,7 @@ def build_ui():
         with gr.Accordion("完整 trace", open=False):
             trace = gr.Textbox(lines=14, show_label=False)
 
-        outputs = [meta, report, plan, code, stdout, trace]
+        outputs = [meta, report, chart, plan, code, stdout, trace]
         inputs = [question, rounds]
 
         example.change(lambda q: q, example, question)
@@ -150,6 +152,7 @@ def main():
         server_port=SERVER_PORT,
         inbrowser=True,
         show_error=True,
+        allowed_paths=[str(config.TRACE_DIR)],
     )
 
 

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 import config
 from ..agents import coder, critic, planner, reporter
+from ..charts import build_chart
 from ..runtime import read_schema, run_code
 from ..state import AgentState, new_state
 
@@ -60,7 +61,14 @@ def _nodes(llm, data_path, rc: RunConfig):
         return critic(llm, state)
 
     def report(state: AgentState) -> dict:
-        return reporter(llm, state)
+        out = reporter(llm, state)
+        figure = build_chart(state.get("result", ""), state.get("question", ""))
+        if figure:
+            out["chart"] = str(figure)
+            out["trace"] = list(out.get("trace", [])) + [
+                {"node": "chart", "path": str(figure)}
+            ]
+        return out
 
     return {"plan": plan, "code": code, "execute": execute, "critique": critique, "report": report}
 

@@ -14,6 +14,7 @@ class AgentState(TypedDict, total=False):
     reason: str
     rounds: int
     report: str
+    chart: str
     trace: list[dict[str, Any]]
     max_rounds: int
     prompt_tokens: int
@@ -32,6 +33,7 @@ def new_state(question: str, schema: str, max_rounds: int = 3) -> AgentState:
         reason="",
         rounds=0,
         report="",
+        chart="",
         trace=[],
         max_rounds=max_rounds,
         prompt_tokens=0,

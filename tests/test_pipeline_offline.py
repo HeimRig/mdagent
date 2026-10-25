@@ -27,7 +27,8 @@ def test_pipeline_trace_records_every_node():
     assert nodes[0] == "planner"
     assert "executor" in nodes
     assert "critic" in nodes
-    assert nodes[-1] == "reporter"
+    assert "reporter" in nodes
+    assert nodes[-1] in ("reporter", "chart")
 
 
 def test_metrics_flag_missing_answer():
