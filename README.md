@@ -53,6 +53,9 @@ python -m pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
 ```
 
 ```bash
+# 0) 起网页界面（能直接点着玩，也方便录 GIF）
+python app.py
+
 # 1) 跑一道题，默认离线基线，不需要任何 API key
 python main.py
 
@@ -109,6 +112,17 @@ set MDA_SANDBOX=docker     # 或 subprocess
 
 Docker 后端跑的是 `--network=none --read-only`、数据只读挂载、512MB 内存 / 1 CPU 上限，
 生成的代码既连不了网也写不了盘。子进程后端只做超时和密钥环境变量清理，**它不是安全边界**。
+
+国内网络下构建镜像有两处会卡，仓库里都已经绕过：
+
+- **拉基础镜像**：`registry-1.docker.io:443` 直连超时 → 在 Docker Desktop 的
+  `~/.docker/daemon.json` 里加 `registry-mirrors`
+- **容器内装依赖**：pip 默认走 `pypi.org` → Dockerfile 用 `ARG PIP_INDEX` 指向阿里源，
+  需要换源时覆盖即可：
+
+```bash
+docker build -t mdagent-sandbox docker/ --build-arg PIP_INDEX=https://pypi.org/simple/
+```
 
 ## 数据集
 
@@ -208,6 +222,7 @@ python -m mdagent.eval.ablation --provider ollama    # 本地模型
 ```
 mdagent/
 ├── main.py                     入口，点运行即用
+├── app.py                      Gradio 网页界面
 ├── config.py                   所有可调常量都在文件顶部
 ├── mdagent/
 │   ├── agents/                 planner / coder / critic / reporter
@@ -233,9 +248,9 @@ mdagent/
 - [x] 真模型实测：本地 qwen2.5-3B 跑 benchmark + 消融，数字已填进本 README
 - [x] benchmark 扩到 24 题 + 8 类题型 + gold SQL 答案键 + 分题型统计
 - [x] 沙箱换成 Docker（`--network=none --read-only`，`auto` 自动回退）
+- [x] Gradio 界面（`python app.py`，四个角色的中间产物都能展开看）
 - [ ] 自动出图：让 Reporter 生成 matplotlib 图并嵌进报告
 - [ ] 多表 / SQLite 数据源
-- [ ] Gradio 界面
 
 ## License
 

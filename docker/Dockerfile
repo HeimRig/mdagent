@@ -3,7 +3,8 @@
 # 只在 docker 后端下使用；subprocess 后端不需要它。
 FROM python:3.11-slim
 
-RUN pip install --no-cache-dir duckdb pandas
+ARG PIP_INDEX=https://mirrors.aliyun.com/pypi/simple/
+RUN pip install --no-cache-dir -i ${PIP_INDEX} duckdb pandas
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
