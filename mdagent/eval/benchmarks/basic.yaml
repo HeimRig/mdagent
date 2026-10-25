@@ -1,6 +1,6 @@
-# 覆盖 top1 / count / aggregate / groupby / filter / timeseries / ratio / multistep
+# 覆盖 top1 / count / aggregate / groupby / filter / timeseries / ratio / multistep / join
 # expect 由同题 gold_sql 在本数据集上实算得到（make key 可重算）
-# 数据源固定为 data/sample/sales.csv
+# 数据源为 data/sample/ 目录下的 sales.csv + products.csv
 
 - id: q1
   question: 哪个城市的销售额最高？是多少？
@@ -136,3 +136,21 @@
   expect: '1830'
   gold_sql: SELECT SUM(qty) AS v FROM sales GROUP BY category ORDER BY v DESC LIMIT
     1
+- id: q25
+  question: 哪个供应商的销售额最高？是多少？
+  tag: join
+  expect: '21465.00'
+  gold_sql: SELECT ROUND(SUM(s.amount),2) AS v FROM sales s JOIN products p ON s.product
+    = p.product GROUP BY p.supplier ORDER BY v DESC LIMIT 1
+- id: q26
+  question: 保质期在 7 天以内的商品，总销售额是多少？
+  tag: join
+  expect: '47654.80'
+  gold_sql: SELECT ROUND(SUM(s.amount),2) AS v FROM sales s JOIN products p ON s.product
+    = p.product WHERE p.shelf_life_days <= 7
+- id: q27
+  question: 杭州生鲜供应的商品，一共卖了多少件？
+  tag: join
+  expect: '257'
+  gold_sql: SELECT SUM(s.qty) AS v FROM sales s JOIN products p ON s.product = p.product
+    WHERE p.supplier = '杭州生鲜'

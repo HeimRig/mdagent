@@ -11,7 +11,7 @@ from pathlib import Path
 import duckdb
 import yaml
 
-DATA = Path(__file__).resolve().parents[3] / "data" / "sample" / "sales.csv"
+DATA_DIR = Path(__file__).resolve().parents[3] / "data" / "sample"
 OUT = Path(__file__).parent / "basic.yaml"
 
 QUESTS: list[tuple[str, str, str, str]] = [
@@ -69,6 +69,15 @@ QUESTS: list[tuple[str, str, str, str]] = [
      "SELECT SUM(amount) AS v FROM sales GROUP BY city ORDER BY v DESC LIMIT 3)"),
     ("q24", "销量（件数）最高的商品分类，一共卖了多少件？", "groupby",
      "SELECT SUM(qty) AS v FROM sales GROUP BY category ORDER BY v DESC LIMIT 1"),
+    ("q25", "哪个供应商的销售额最高？是多少？", "join",
+     "SELECT ROUND(SUM(s.amount),2) AS v FROM sales s "
+     "JOIN products p ON s.product = p.product GROUP BY p.supplier ORDER BY v DESC LIMIT 1"),
+    ("q26", "保质期在 7 天以内的商品，总销售额是多少？", "join",
+     "SELECT ROUND(SUM(s.amount),2) AS v FROM sales s "
+     "JOIN products p ON s.product = p.product WHERE p.shelf_life_days <= 7"),
+    ("q27", "杭州生鲜供应的商品，一共卖了多少件？", "join",
+     "SELECT SUM(s.qty) AS v FROM sales s "
+     "JOIN products p ON s.product = p.product WHERE p.supplier = '杭州生鲜'"),
 ]
 
 
@@ -96,7 +105,12 @@ def _distinctive(expect: str) -> bool:
 
 def main() -> None:
     con = duckdb.connect()
-    con.execute(f"CREATE VIEW sales AS SELECT * FROM read_csv_auto('{DATA.as_posix()}')")
+    con.execute(
+        f"CREATE VIEW sales AS SELECT * FROM read_csv_auto('{(DATA_DIR / 'sales.csv').as_posix()}')"
+    )
+    con.execute(
+        f"CREATE VIEW products AS SELECT * FROM read_csv_auto('{(DATA_DIR / 'products.csv').as_posix()}')"
+    )
 
     items, bad = [], []
     for qid, question, tag, sql in QUESTS:
@@ -111,9 +125,9 @@ def main() -> None:
         print("\n期望值太短，容易被误匹配，请换题：", bad, file=sys.stderr)
         raise SystemExit(1)
 
-    head = ("# 覆盖 top1 / count / aggregate / groupby / filter / timeseries / ratio / multistep\n"
+    head = ("# 覆盖 top1 / count / aggregate / groupby / filter / timeseries / ratio / multistep / join\n"
             "# expect 由同题 gold_sql 在本数据集上实算得到（make key 可重算）\n"
-            "# 数据源固定为 data/sample/sales.csv\n\n")
+            "# 数据源为 data/sample/ 目录下的 sales.csv + products.csv\n\n")
     OUT.write_text(head + yaml.safe_dump(items, allow_unicode=True, sort_keys=False),
                    encoding="utf-8")
     print(f"\n{len(items)} questions -> {OUT}")

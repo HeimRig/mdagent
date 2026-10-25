@@ -11,7 +11,7 @@ from dataclasses import dataclass
 import config
 from ..agents import coder, critic, planner, reporter
 from ..charts import build_chart
-from ..runtime import read_schema, run_code
+from ..runtime import bootstrap_code, read_schema, resolve, run_code
 from ..state import AgentState, new_state
 
 MAX_REPAIR_ROUNDS = config.MAX_REPAIR_ROUNDS
@@ -88,7 +88,7 @@ def build_graph(llm, data_path=None, run_config: RunConfig | None = None):
     except ImportError:
         return None
 
-    nodes = _nodes(llm, data_path or config.DATA_PATH, run_config or RunConfig())
+    nodes = _nodes(llm, data_path or config.DATA_SOURCE, run_config or RunConfig())
     g = StateGraph(AgentState)
     for name, fn in nodes.items():
         g.add_node(name, fn)
@@ -117,12 +117,14 @@ def _run_loop(nodes, init: AgentState) -> AgentState:
 def run_pipeline(question: str, llm, data_path=None, schema: str | None = None,
                  run_config: RunConfig | None = None) -> AgentState:
     rc = run_config or RunConfig()
-    data_path = data_path or config.DATA_PATH
+    source = data_path or config.DATA_SOURCE
+    ds = resolve(source)
     if schema is None:
-        schema = read_schema(data_path)
-    init = new_state(question, schema, max_rounds=rc.max_rounds)
+        schema = read_schema(source)
+    init = new_state(question, schema, max_rounds=rc.max_rounds,
+                     tables=ds.tables, bootstrap=bootstrap_code(source))
 
-    graph = build_graph(llm, data_path, rc)
+    graph = build_graph(llm, source, rc)
     if graph is None:
         return _run_loop(_nodes(llm, data_path, rc), init)
     return graph.invoke(init)

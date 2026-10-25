@@ -15,7 +15,7 @@ from mdagent.utils import force_utf8_stdout
 def main() -> None:
     force_utf8_stdout()
     llm = build_backend()
-    state = run_pipeline(config.DEMO_QUESTION, llm, config.DATA_PATH)
+    state = run_pipeline(config.DEMO_QUESTION, llm, config.DATA_SOURCE)
 
     line = "=" * 64
     print(line)

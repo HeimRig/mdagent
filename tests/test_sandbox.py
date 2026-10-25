@@ -7,7 +7,7 @@ from mdagent.runtime import active_backend, docker_ready, read_schema, run_code
 
 
 def test_read_schema_contains_columns():
-    schema = read_schema(config.DATA_PATH)
+    schema = read_schema(config.DATA_SOURCE)
     assert "city" in schema
     assert "amount" in schema
     assert "样例行" in schema
@@ -23,7 +23,7 @@ def test_run_code_can_read_data_via_env():
     code = (
         "import os, duckdb\n"
         "con = duckdb.connect()\n"
-        "print(con.execute(\"SELECT COUNT(*) FROM read_csv_auto('\" + os.environ['MDA_DATA'] + \"')\").fetchone()[0])\n"
+        "print(con.execute(\"SELECT COUNT(*) FROM read_csv_auto('\" + os.environ['MDA_DATA'] + \"/sales.csv')\").fetchone()[0])\n"
     )
     ok, out, err = run_code(code)
     assert ok, err
@@ -53,7 +53,7 @@ def test_docker_backend_has_no_network_and_readonly_fs():
     code = (
         "import os, socket, duckdb\n"
         "con = duckdb.connect()\n"
-        "n = con.execute(\"SELECT COUNT(*) FROM read_csv_auto('\" + os.environ['MDA_DATA'] + \"')\").fetchone()[0]\n"
+        "n = con.execute(\"SELECT COUNT(*) FROM read_csv_auto('\" + os.environ['MDA_DATA'] + \"/sales.csv')\").fetchone()[0]\n"
         "print('rows', n)\n"
         "try:\n"
         "    open('/work/x', 'w').write('x')\n"

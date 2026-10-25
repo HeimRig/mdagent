@@ -32,7 +32,7 @@ import duckdb
 
 DATA = os.environ["MDA_DATA"]
 con = duckdb.connect()
-con.execute("CREATE VIEW sales AS SELECT * FROM read_csv_auto('" + DATA + "')")
+con.execute("CREATE VIEW sales AS SELECT * FROM read_csv_auto('" + DATA + "/sales.csv')")
 print(con.execute(__SQL__).fetchdf().to_string(index=False))
 """
 

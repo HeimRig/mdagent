@@ -5,3 +5,5 @@
 *.gif binary
 *.gguf binary
 *.ico binary
+*.sqlite binary
+*.db binary

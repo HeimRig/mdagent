@@ -6,6 +6,8 @@
   生成的代码仍能读文件系统、能联网。
 - `docker`：`--network=none --read-only` + 只读挂载数据 + 内存/CPU 限额，真隔离。
   镜像用 `make docker-image` 构建，镜像不在就自动回退子进程（`auto` 模式）。
+
+数据源可以是单个 CSV、目录或数据库文件，统一由 `data.py` 解析。
 """
 
 import os
@@ -16,38 +18,33 @@ import tempfile
 import uuid
 from pathlib import Path
 
-import duckdb
-
 import config
+from .data import DataSource, resolve, schema_text
 
 _DOCKER_OK: bool | None = None
+MOUNT = "/data"
 
 
-def read_schema(data_path: Path, sample_rows: int = 3) -> str:
-    """读出表结构与样例行，喂给 Planner，避免它瞎猜字段名。"""
-    data_path = Path(data_path)
-    con = duckdb.connect()
-    rel = f"read_csv_auto('{data_path.as_posix()}')" if data_path.suffix != ".db" else f"'{data_path.as_posix()}'"
-    cols = con.execute(f"DESCRIBE SELECT * FROM {rel}").fetchall()
-    lines = ["表名: sales", "字段:"]
-    for name, dtype, *_ in cols:
-        lines.append(f"  - {name}: {dtype}")
-    head = con.execute(f"SELECT * FROM {rel} LIMIT {sample_rows}").fetchdf()
-    lines.append("样例行:")
-    lines.append(head.to_string(index=False))
-    con.close()
-    return "\n".join(lines)
+def read_schema(source=None, sample_rows: int = 3) -> str:
+    """读出所有表的结构与样例行，喂给 Planner / Coder，避免它们瞎猜字段名。"""
+    return schema_text(source, sample_rows)
 
 
 _SECRET_HINTS = ("API_KEY", "TOKEN", "SECRET", "PASSWORD")
 
 
-def _safe_env(data_path: Path) -> dict[str, str]:
+def _safe_env() -> dict[str, str]:
     """继承运行环境，但抹掉所有像密钥的变量，避免生成的代码把它们读走。"""
-    env = {k: v for k, v in os.environ.items()
-           if not any(h in k.upper() for h in _SECRET_HINTS)}
-    env["MDA_DATA"] = data_path.as_posix()
+    return {k: v for k, v in os.environ.items()
+            if not any(h in k.upper() for h in _SECRET_HINTS)}
+
+
+def _env_for(ds: DataSource, mount: str) -> dict[str, str]:
+    env = _safe_env()
+    env["MDA_DATA"] = mount
     env["PYTHONIOENCODING"] = "utf-8"
+    if ds.db_file:
+        env["MDA_DB"] = f"{mount}/{ds.db_file}"
     return env
 
 
@@ -78,7 +75,7 @@ def active_backend() -> str:
     return "subprocess"
 
 
-def _run_subprocess(code: str, data_path: Path, timeout: int) -> tuple[bool, str, str]:
+def _run_subprocess(code: str, ds: DataSource, timeout: int) -> tuple[bool, str, str]:
     with tempfile.TemporaryDirectory(prefix="mdagent_") as tmp:
         script = Path(tmp) / "snippet.py"
         script.write_text(code, encoding="utf-8")
@@ -89,7 +86,7 @@ def _run_subprocess(code: str, data_path: Path, timeout: int) -> tuple[bool, str
                 text=True,
                 timeout=timeout,
                 cwd=tmp,
-                env=_safe_env(data_path),
+                env=_env_for(ds, ds.root.as_posix()),
                 encoding="utf-8",
                 errors="replace",
             )
@@ -99,7 +96,7 @@ def _run_subprocess(code: str, data_path: Path, timeout: int) -> tuple[bool, str
     return proc.returncode == 0, (proc.stdout or "").strip(), (proc.stderr or "").strip()
 
 
-def _run_docker(code: str, data_path: Path, timeout: int) -> tuple[bool, str, str]:
+def _run_docker(code: str, ds: DataSource, timeout: int) -> tuple[bool, str, str]:
     name = f"mdagent-{uuid.uuid4().hex[:10]}"
     workdir = Path(tempfile.mkdtemp(prefix="mdagent_"))
     try:
@@ -109,12 +106,15 @@ def _run_docker(code: str, data_path: Path, timeout: int) -> tuple[bool, str, st
             "--network=none", "--read-only", "--tmpfs", "/tmp",
             "--memory", "512m", "--cpus", "1", "--pids-limit", "128",
             "-e", "PYTHONDONTWRITEBYTECODE=1",
-            "-e", f"MDA_DATA=/data/{data_path.name}",
             "-v", f"{workdir.as_posix()}:/work:ro",
-            "-v", f"{data_path.parent.as_posix()}:/data:ro",
+            "-v", f"{ds.root.as_posix()}:{MOUNT}:ro",
             "-w", "/work",
-            config.SANDBOX_IMAGE, "python", "/work/snippet.py",
         ]
+        for key, val in _env_for(ds, MOUNT).items():
+            if key.startswith("MDA_"):
+                cmd += ["-e", f"{key}={val}"]
+        cmd += [config.SANDBOX_IMAGE, "python", "/work/snippet.py"]
+
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
                                   encoding="utf-8", errors="replace")
@@ -126,18 +126,18 @@ def _run_docker(code: str, data_path: Path, timeout: int) -> tuple[bool, str, st
         shutil.rmtree(workdir, ignore_errors=True)
 
 
-def run_code(code: str, data_path: Path | None = None, timeout: int | None = None,
+def run_code(code: str, source=None, timeout: int | None = None,
              backend: str | None = None) -> tuple[bool, str, str]:
     """执行生成的代码，返回 (是否成功, stdout, stderr)。"""
-    data_path = Path(data_path or config.DATA_PATH).resolve()
+    ds = resolve(source)
     timeout = timeout or config.SANDBOX_TIMEOUT
     backend = str(backend or config.SANDBOX_BACKEND).lower()
 
     if backend in ("auto", "docker") and docker_ready():
-        return _run_docker(code, data_path, timeout)
+        return _run_docker(code, ds, timeout)
     if backend == "docker":
         return False, "", (
             "Docker 后端不可用：确认 Docker Desktop 已启动，"
             f"且已构建镜像（docker build -t {config.SANDBOX_IMAGE} docker/）"
         )
-    return _run_subprocess(code, data_path, timeout)
+    return _run_subprocess(code, ds, timeout)

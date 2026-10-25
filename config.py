@@ -17,7 +17,8 @@ LLM_MAX_TOKENS = 1200
 LLM_TIMEOUT = 180
 
 # ---------- 数据 ----------
-DATA_PATH = ROOT / "data" / "sample" / "sales.csv"
+# 可以是单个 CSV、装着多个 CSV 的目录、或者 .duckdb / .sqlite 文件
+DATA_SOURCE = os.getenv("MDA_DATA_SOURCE", str(ROOT / "data" / "sample"))
 
 # ---------- 运行时 ----------
 # 沙箱后端：subprocess = 子进程（本机够用）；docker = 真隔离；

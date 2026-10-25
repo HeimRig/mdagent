@@ -6,6 +6,9 @@ FROM python:3.11-slim
 ARG PIP_INDEX=https://mirrors.aliyun.com/pypi/simple/
 RUN pip install --no-cache-dir -i ${PIP_INDEX} duckdb pandas
 
+# 预装 sqlite 扩展：沙箱跑在 --network=none 下，运行时下载不了
+RUN python -c "import duckdb; duckdb.connect().execute('INSTALL sqlite')"
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 

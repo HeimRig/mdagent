@@ -60,10 +60,11 @@ docker 后端的镜像只装 duckdb + pandas（约 200MB），`make docker-image
 
 ## 5. 评测为什么是重点
 
-功能人人能写，能报出"准确率 83%、平均 1.5 轮自愈、平均 1.9k token"的项目不多。
+功能人人能写，能报出"准确率 52%、平均 1.7 轮自愈、平均 2.6k token，并且说清这个数字
+有多不稳"的项目不多。
 
-benchmark 共 24 题，覆盖 8 类题型（top1 / count / aggregate / groupby / filter /
-timeseries / ratio / multistep）。四条设计约束值得说明：
+benchmark 共 27 题，覆盖 9 类题型（top1 / count / aggregate / groupby / filter /
+timeseries / ratio / multistep / join），其中 join 组必须跨两张表。四条设计约束值得说明：
 
 1. **答案键不能手敲**。每题配一条 reference SQL，`expect` 由 SQL 在数据集上实算得到
    （`make key`）。改数据就重算，不会出现"题目换了数据没换"的静默错误。

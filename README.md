@@ -126,65 +126,89 @@ docker build -t mdagent-sandbox docker/ --build-arg PIP_INDEX=https://pypi.org/s
 
 ## 数据集
 
-`data/sample/sales.csv`：240 笔订单，2026 年 1–6 月，6 个城市、5 个分类、13 个 SKU。
-固定随机种子生成，`make data` 可完整复现。
+`data/sample/` 下是同内容的两种形态，都用固定种子生成、`make data` 可完整复现：
+
+| 文件 | 内容 |
+|------|------|
+| `sales.csv` | 240 笔订单，2026 年 1–6 月，6 个城市、5 个分类、13 个 SKU |
+| `products.csv` | 13 个 SKU 的维度表：供应商、进货成本、保质期 |
+| `sales.sqlite` | 上面两张表装进一个 SQLite 文件 |
+
+数据源由 `config.DATA_SOURCE` 决定，三种形态都支持（用 `MDA_DATA_SOURCE` 覆盖）：
+
+```bash
+set MDA_DATA_SOURCE=data/sample                    # CSV 目录 → sales + products 两张表（默认）
+set MDA_DATA_SOURCE=data/sample/sales.csv          # 单个 CSV → 只有 sales
+set MDA_DATA_SOURCE=data/sample/sales.sqlite       # SQLite → sales + products
+```
+
+沙箱里会根据数据源自动生成建视图的引导代码：CSV 走 `read_csv_auto`，SQLite 走
+duckdb 的 `sqlite` 扩展（镜像构建时已预装，`--network=none` 下也能 `LOAD`）。
 
 ## Benchmark
 
-24 道题，覆盖 8 类题型：top1 / count / aggregate / groupby / filter / timeseries /
-ratio / multistep。每题的期望答案**由同题的 reference SQL 在数据集上实算得到**
-（`make key` 可重算），题目和 gold SQL 都写在 `mdagent/eval/benchmarks/basic.yaml`，
-可以逐条复核——不是手敲的一串数字。
+27 道题，覆盖 9 类题型：top1 / count / aggregate / groupby / filter / timeseries /
+ratio / multistep / join，其中 3 道 join 必须跨 `sales` 和 `products` 两张表。
+
+每题的期望答案**由同题的 reference SQL 在数据集上实算得到**（`make key` 可重算），
+题目和 gold SQL 都写在 `mdagent/eval/benchmarks/basic.yaml`，可以逐条复核——
+不是手敲的一串数字。
 
 判分优先子串匹配，数字再走一次容差比较（`49120.80` 与 `49120.8` 视为相同）。
 报告里会标出本次用的沙箱后端。
 
-**本地 qwen2.5-3B（Ollama + RTX 4060 Laptop 8G）实测**：
+**本地 qwen2.5-3B（Ollama + RTX 4060 Laptop 8G）实测，27 题 / 多表数据源**：
 
 | 指标 | 数值 |
 |------|------|
-| 答案准确率 | 20/24 = **83.33%** |
-| 执行成功率 | 95.83% |
-| Critic 通过率 | 79.17% |
-| 平均自愈轮数 | 1.46 |
-| 平均延迟 | 3.87 s/题 |
-| 平均 token | 1796 |
+| 答案准确率 | 14/27 = **51.85%** |
+| 执行成功率 | 92.59% |
+| Critic 通过率 | 66.67% |
+| 平均自愈轮数 | 1.74 |
+| 平均延迟 | 6.03 s/题 |
+| 平均 token | 2564 |
 
 | 题型 | 题数 | 准确率 |
 |------|------|--------|
-| filter | 5 | 100% |
-| groupby | 2 | 100% |
-| ratio | 2 | 100% |
 | count | 1 | 100% |
+| groupby | 2 | 100% |
 | top1 | 5 | 80.00% |
-| multistep | 4 | 75.00% |
-| aggregate | 3 | 66.67% |
-| timeseries | 2 | 50.00% |
+| filter | 5 | 60.00% |
+| ratio | 2 | 50.00% |
+| aggregate | 3 | 33.33% |
+| join | 3 | 33.33% |
+| multistep | 4 | 25.00% |
+| timeseries | 2 | 0.00% |
 
-4 道错题都不是"不会写 SQL"，而是**该聚合的地方没聚合**：
+> **别把这个数字当稳定值。** 同一份代码连跑三次，24 题口径的准确率分别是
+> 66.67% / 70.83% / 54.17%——一道题就是 4 个百分点，3B 模型在这个题量上的单次
+> 结果并不可复现，`temperature=0` 也压不住。相对差异可信，绝对值要多次平均再看。
+> 想拿稳定数字，换 7B 以上或在线模型。
 
-- q7 / q23 把明细当答案（问"最高是多少"，给了 `MAX(amount)` 或整张 Top3 明细，没有 `SUM`）
-- q19 要平均值，模型把每笔订单的件数全打了出来
-- q5 时间序列写错，自愈 3 轮仍未跑通
+反复出现的错法：
 
-**离线规则基线**（无 API key、CI 用、`make bench` 复现）：准确率 7/24 = 29.17%、
-执行成功率 100%、平均 1.0 轮。
+- **该聚合的地方没聚合**：问"最高是多少"，给了 `MAX(amount)` 或整张 TopN 明细
+- **时间过滤条件写错**：月份区间偏移，自愈 3 轮仍未跑通
+- **多表之后选错表**：两张表都有 `product` / `category`，3B 偶尔去 `products` 上做聚合
 
-> 这套题连跑三次，`full` 都是 20/24（q5/q7/q19/q23 稳定失败），但个别题在复跑时
-> 会翻转（q10 出现过一次例外）。24 题下单题抖动约 ±4 个百分点，所以下面的消融
-> 只比同一轮内的相对差异，不追绝对值。
+**离线规则基线**（无 API key、CI 用、`make bench` 复现）：准确率 7/27 = **25.93%**、
+执行成功率 100%、平均 1.0 轮。它连"表名"都靠关键词硬映射，join 组全军覆没，
+正好说明这类基线只能当"跑通"的对照组。
 
 报告落在 `mdagent/eval/reports/report.md`。
 
 ## 消融实验
 
 `RunConfig` 把四个组件做成了开关（Planner / Critic / schema 注入 / 自愈轮数），
-逐项关掉再跑同一套 24 题，就能看出每个组件值多少分：
+逐项关掉再跑同一套题，就能看出每个组件值多少分：
 
 ```bash
 make ablation                                        # 离线基线
 python -m mdagent.eval.ablation --provider ollama    # 本地模型
 ```
+
+> 下表是 **24 题、单表 schema 时期**跑的，加多表和 JOIN 题之后没有重跑
+> （5 组 × 27 题约 15 分钟）。看相对大小就行，绝对值会随题集变化。
 
 **qwen2.5-3B 实测**：
 
@@ -228,14 +252,18 @@ mdagent/
 │   ├── agents/                 planner / coder / critic / reporter
 │   ├── graph/pipeline.py       LangGraph 状态机（含无依赖退化路径）
 │   ├── runtime/sandbox.py      子进程 / Docker 双后端，auto 自动回退
+│   ├── runtime/data.py         数据源抽象：CSV / CSV 目录 / duckdb / SQLite
 │   ├── charts.py               结果表格 → 图表，数据形状不合适就不画
 │   ├── llm/                    offline / openai 兼容后端
 │   └── eval/                   benchmark + 指标 + 报告 + 消融实验
 │       └── benchmarks/         题目 + gold SQL + 答案键生成器
 ├── data/
 │   ├── generate_sample.py      样例数据生成器（固定种子）
-│   └── sample/sales.csv        240 笔订单
-├── docker/Dockerfile           沙箱镜像（duckdb + pandas）
+│   └── sample/
+│       ├── sales.csv           240 笔订单
+│       ├── products.csv        13 个 SKU 的维度表
+│       └── sales.sqlite        上面两张表的 SQLite 版本
+├── docker/Dockerfile           沙箱镜像（duckdb + pandas + sqlite 扩展）
 ├── docs/architecture.md        设计取舍说明
 └── .github/workflows/ci.yml    push 自动跑测试 + benchmark
 ```
@@ -247,11 +275,11 @@ mdagent/
 - [x] benchmark + 指标 + CI
 - [x] 消融实验脚本（`RunConfig` 开关 + 对比表）
 - [x] 真模型实测：本地 qwen2.5-3B 跑 benchmark + 消融，数字已填进本 README
-- [x] benchmark 扩到 24 题 + 8 类题型 + gold SQL 答案键 + 分题型统计
+- [x] benchmark 扩到 27 题 + 9 类题型（含跨表 JOIN）+ gold SQL 答案键 + 分题型统计
 - [x] 沙箱换成 Docker（`--network=none --read-only`，`auto` 自动回退）
 - [x] Gradio 界面（`python app.py`，四个角色的中间产物都能展开看）
 - [x] 自动出图：结果表格满足「类别列 + 数值列」时画柱状图（`mdagent/charts.py`）
-- [ ] 多表 / SQLite 数据源
+- [x] 多表 / SQLite 数据源（`mdagent/runtime/data.py`，`MDA_DATA_SOURCE` 三选一）
 
 ## License
 

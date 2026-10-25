@@ -1,6 +1,6 @@
 """Gradio 演示界面。改顶部常量后直接运行本文件：
 
-    DATA_PATH    数据文件
+    DATA_SOURCE  数据源（CSV 文件 / CSV 目录 / 数据库文件）
     SERVER_PORT  本地端口
 
 启动后浏览器打开 http://127.0.0.1:7860
@@ -17,7 +17,7 @@ from mdagent.llm import build_backend
 from mdagent.runtime import active_backend
 from mdagent.utils import force_utf8_stdout
 
-DATA_PATH = config.DATA_PATH
+DATA_SOURCE = config.DATA_SOURCE
 SERVER_PORT = 7860
 MAX_ROUNDS = config.MAX_REPAIR_ROUNDS
 
@@ -71,7 +71,7 @@ def answer(question, max_rounds, progress=gr.Progress()):
     started = time.time()
     try:
         state = run_pipeline(
-            question, _get_llm(), DATA_PATH,
+            question, _get_llm(), DATA_SOURCE,
             run_config=RunConfig(max_rounds=int(max_rounds)),
         )
     except Exception as exc:

@@ -6,6 +6,8 @@ from typing import Any, TypedDict
 class AgentState(TypedDict, total=False):
     question: str
     schema: str
+    tables: list[str]
+    bootstrap: str
     plan: str
     code: str
     result: str
@@ -21,10 +23,13 @@ class AgentState(TypedDict, total=False):
     completion_tokens: int
 
 
-def new_state(question: str, schema: str, max_rounds: int = 3) -> AgentState:
+def new_state(question: str, schema: str, max_rounds: int = 3,
+              tables: list[str] | None = None, bootstrap: str = "") -> AgentState:
     return AgentState(
         question=question,
         schema=schema,
+        tables=list(tables or []),
+        bootstrap=bootstrap,
         plan="",
         code="",
         result="",

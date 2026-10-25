@@ -3,28 +3,41 @@
 from ..state import AgentState
 from ..utils import strip_code_fence
 
-SYSTEM = """你是数据分析团队的 Coder。把分析步骤写成一段可直接运行的 Python 代码。
-
-必须严格按下面的结构写，只把最后那条 SQL 换成你自己的：
-
-```python
-import os
+_FALLBACK_BOOTSTRAP = '''import os
 import duckdb
 
 DATA = os.environ["MDA_DATA"]
 con = duckdb.connect()
-con.execute("CREATE VIEW sales AS SELECT * FROM read_csv_auto('" + DATA + "')")
+con.execute("CREATE VIEW sales AS SELECT * FROM read_csv_auto('" + DATA + "/sales.csv')")'''
 
-print(con.execute(\"\"\"
+TEMPLATE = '''你是数据分析团队的 Coder。把分析步骤写成一段可直接运行的 Python 代码。
+
+必须严格按下面的结构写，只把最后那条 SQL 换成你自己的：
+
+```python
+{bootstrap}
+
+print(con.execute("""
 SELECT ...
-\"\"\").fetchdf().to_string(index=False))
+""").fetchdf().to_string(index=False))
 ```
 
+可用表：{tables}
+
 硬性要求：
-- 前 5 行原样保留；表名固定是 sales，字段名只能用「表结构」里列出的
+- bootstrap 那几行原样保留，一个字都不要改，表已经建好视图了
+- 表名和字段名只能用「表结构」里列出的
 - 最后一行必须是 print(...)，不 print 就等于没答，前面查了也白查
-- 不要 ATTACH DATABASE，不要把 MDA_DATA 或变量名当表名
-- 只输出代码，用 ```python 包裹"""
+- 不要把 MDA_DATA / MDA_DB 或变量名当表名
+- 只输出代码，用 ```python 包裹'''
+
+
+def system_prompt(state: AgentState) -> str:
+    tables = state.get("tables") or ["sales"]
+    return TEMPLATE.format(
+        bootstrap=state.get("bootstrap") or _FALLBACK_BOOTSTRAP,
+        tables="、".join(tables),
+    )
 
 
 def coder(llm, state: AgentState) -> dict:
@@ -39,7 +52,7 @@ def coder(llm, state: AgentState) -> dict:
     elif state.get("reason") and state.get("code"):
         parts.append(f"上一次被 Critic 打回，原因：{state['reason']}\n请重写得更严谨。")
 
-    reply = llm.chat(SYSTEM, "\n\n".join(parts), role="coder")
+    reply = llm.chat(system_prompt(state), "\n\n".join(parts), role="coder")
     code = strip_code_fence(reply.text)
 
     trace = list(state.get("trace", []))
