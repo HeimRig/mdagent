@@ -65,7 +65,10 @@ python -m mdagent.eval.runner
 # 3) 单元测试
 pytest -q
 
-# 4) 改了数据就重算答案键（题目和 gold SQL 在 benchmarks/basic.yaml 里）
+# 4) 连跑 3 次看结果稳不稳（输出逐题翻转情况）
+python -m mdagent.eval.stability --provider deepseek --runs 3
+
+# 5) 改了数据就重算答案键（题目和 gold SQL 在 benchmarks/basic.yaml 里）
 make key
 ```
 
@@ -193,6 +196,22 @@ WHERE s.city = '杭州' AND p.supplier = '杭州生鲜供应'
 供应商的真名是 `杭州生鲜`，模型把它读成「杭州 + 生鲜供应」，多加了一个 city 过滤。
 这是**题面歧义**，不是能力问题——题面保留原样，因为改题目去迁就模型会让数字失去意义。
 
+**复跑稳定性（同一份代码连跑 3 次，27 题）**：
+
+| | run 1 | run 2 | run 3 |
+|---|---|---|---|
+| 答案准确率 | 96.30% | 96.30% | 96.30% |
+| 执行成功率 | 100% | 100% | 100% |
+| Critic 通过率 | 96.30% | 96.30% | 96.30% |
+| 平均自愈轮数 | 1.07 | 1.15 | 1.15 |
+| 平均延迟 | 5.72 s | 5.55 s | 5.66 s |
+| 平均 token | 1616 | 1700 | 1704 |
+
+准确率极差 **0.00 个百分点**：26 道题三次全中，q27 三次全错，**没有任何一道题
+在复跑中翻转**。同样 `temperature=0`，3B 那边一次能差 12 个百分点，DeepSeek 的
+稳定性足以支撑单次结果——只有轮数和 token 有小幅浮动，那是自愈回路的不确定性，
+不影响最终答案。
+
 **本地 qwen2.5-3B（Ollama + RTX 4060 Laptop 8G）同一套题**：
 
 | 指标 | 3B | DeepSeek-Chat |
@@ -286,7 +305,7 @@ mdagent/
 │   ├── runtime/data.py         数据源抽象：CSV / CSV 目录 / duckdb / SQLite
 │   ├── charts.py               结果表格 → 图表，数据形状不合适就不画
 │   ├── llm/                    offline / openai 兼容后端
-│   └── eval/                   benchmark + 指标 + 报告 + 消融实验
+│   └── eval/                   benchmark + 指标 + 报告 + 消融 / 稳定性复跑
 │       └── benchmarks/         题目 + gold SQL + 答案键生成器
 ├── data/
 │   ├── generate_sample.py      样例数据生成器（固定种子）
