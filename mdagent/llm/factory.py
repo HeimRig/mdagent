@@ -7,7 +7,7 @@ _PRESETS = {
     "deepseek": ("https://api.deepseek.com", "deepseek-chat"),
     "moonshot": ("https://api.moonshot.cn/v1", "moonshot-v1-8k"),
     "openai": ("https://api.openai.com/v1", "gpt-4o-mini"),
-    "ollama": ("http://localhost:11434/v1", "qwen2.5:7b"),
+    "ollama": ("http://localhost:11434/v1", "qwen25-3b"),
     "siliconflow": ("https://api.siliconflow.cn/v1", "Qwen/Qwen2.5-7B-Instruct"),
 }
 
